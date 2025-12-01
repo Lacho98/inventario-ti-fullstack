@@ -23,7 +23,10 @@ Puede ejecutarse tanto de forma local como mediante Docker Compose.
 
 ## EJECUCIÓN CON DOCKER COMPOSE (Recomendado)
 Desde la raíz del proyecto:(Donde se encuentra **docker-compose.yml**)
+
+Ejecutar el siguiente comando:
 docker compose up --build
+
 Servicios iniciados:
 - Frontend: http://localhost:3000
 - Backend: http://localhost:8080/swagger
@@ -84,18 +87,21 @@ VITE_API_BASE_URL
 
 ### Iniciar backend:
 cd backend/Backend
+
 dotnet run
+
 Disponible en:
 http://localhost:<puerto>/swagger
 
 ### Iniciar frontend:
 cd frontend
+
 npm run dev
+
 Disponible en:
 http://localhost:5173
 
 ---
-
 
 
 ## ESTADO DEL PROYECTO
