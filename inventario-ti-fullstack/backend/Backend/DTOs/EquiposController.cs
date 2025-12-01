@@ -1,5 +1,6 @@
 ﻿using Backend.Data;
 using Backend.DTOs;
+using Backend.DTOs.Equipos;     
 using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,11 +20,15 @@ namespace Backend.Controllers
 
         // GET: api/equipos?estado=disponible&tipoEquipo=Laptop
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Equipo>>> GetEquipos(
+        public async Task<ActionResult<IEnumerable<EquipoListDto>>> GetEquipos(
             [FromQuery] string? estado,
             [FromQuery] string? tipoEquipo)
         {
-            var query = _context.Equipos.AsQueryable();
+            var query = _context.Equipos
+                .Include(e => e.EmpleadoAsignado)
+                    .ThenInclude(emp => emp.Rol)   
+                .AsQueryable();
+
 
             if (!string.IsNullOrWhiteSpace(estado))
             {
@@ -35,9 +40,31 @@ namespace Backend.Controllers
                 query = query.Where(e => e.TipoEquipo == tipoEquipo);
             }
 
-            var equipos = await query.ToListAsync();
-            return Ok(equipos);
+            var lista = await query
+                .Select(e => new EquipoListDto
+                {
+                    Id = e.Id,
+                    TipoEquipo = e.TipoEquipo,
+                    Modelo = e.Modelo,
+                    NumeroSerie = e.NumeroSerie,
+                    Estado = e.Estado,
+                    Costo = e.Costo,
+
+                    EmpleadoAsignado = e.EmpleadoAsignado != null
+                        ? e.EmpleadoAsignado.NombreCompleto
+                        : null,
+
+                    RolEmpleado = e.EmpleadoAsignado != null
+                        ? e.EmpleadoAsignado.Rol.NombreRol
+                        : null
+                })
+
+                .ToListAsync();
+
+            return Ok(lista);
         }
+
+
 
         // GET: api/equipos/5
         [HttpGet("{id:int}")]
@@ -58,7 +85,6 @@ namespace Backend.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            // Validación básica
             if (dto.Costo <= 0)
                 return BadRequest(new { mensaje = "El costo debe ser mayor a cero." });
 
@@ -69,7 +95,7 @@ namespace Backend.Controllers
                 NumeroSerie = dto.NumeroSerie,
                 Costo = dto.Costo,
                 Especificaciones = dto.Especificaciones,
-                Estado = "disponible" // por defecto
+                Estado = "disponible" 
             };
 
             _context.Equipos.Add(equipo);
@@ -81,5 +107,18 @@ namespace Backend.Controllers
                 equipo
             );
         }
+
+        [HttpGet("tipos")]
+        public async Task<ActionResult<IEnumerable<string>>> GetTiposEquipos()
+        {
+            var tipos = await _context.NecesidadesPorRol
+                .Select(n => n.TipoEquipo)
+                .Distinct()
+                .OrderBy(t => t)
+                .ToListAsync();
+
+            return Ok(tipos);
+        }
+
     }
 }

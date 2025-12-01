@@ -7,5 +7,7 @@
 
         public ICollection<PerfilRequerimiento> PerfilesRequerimientos { get; set; } = new List<PerfilRequerimiento>();
         public ICollection<DetalleSolicitud> DetallesSolicitud { get; set; } = new List<DetalleSolicitud>();
+
+        public ICollection<NecesidadPorRol> Necesidades { get; set; } = new List<NecesidadPorRol>();
     }
 }

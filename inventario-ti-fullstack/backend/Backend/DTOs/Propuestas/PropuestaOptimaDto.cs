@@ -13,7 +13,7 @@
     {
         public int RolId { get; set; }
         public string Rol { get; set; } = string.Empty;
-        public int PuestoNumero { get; set; }   // 1, 2, 3...
+        public int PuestoNumero { get; set; }   
         public List<EquipoAsignadoDto> Equipos { get; set; } = new();
     }
 

@@ -20,7 +20,6 @@ namespace Backend.Controllers
         }
 
         // POST: api/solicitudes
-        // Crea una nueva solicitud de equipamiento
         [HttpPost]
         public async Task<ActionResult<SolicitudDetalleDto>> CrearSolicitud([FromBody] SolicitudCreateDto dto)
         {
@@ -33,7 +32,6 @@ namespace Backend.Controllers
             if (dto.RolesSolicitados == null || dto.RolesSolicitados.Count == 0)
                 return BadRequest(new { mensaje = "Debes especificar al menos un rol solicitado." });
 
-            // Validar que los roles existan
             var rolesIds = dto.RolesSolicitados.Select(r => r.RolId).Distinct().ToList();
             var rolesExistentes = await _context.Roles
                 .Where(r => rolesIds.Contains(r.Id))
@@ -54,7 +52,6 @@ namespace Backend.Controllers
                 NombreSolicitud = dto.NombreSolicitud,
                 Fecha = DateTime.UtcNow,
                 Estado = "pendiente",
-                // CreadoPorId = null // si luego agregas autenticación, se puede llenar
             };
 
             foreach (var rolSolicitado in dto.RolesSolicitados)
@@ -69,7 +66,6 @@ namespace Backend.Controllers
             _context.SolicitudesEquipamiento.Add(solicitud);
             await _context.SaveChangesAsync();
 
-            // Mapear a DTO de detalle para la respuesta
             var resultado = new SolicitudDetalleDto
             {
                 Id = solicitud.Id,
@@ -88,7 +84,6 @@ namespace Backend.Controllers
         }
 
         // GET: api/solicitudes
-        // Lista todas las solicitudes
         [HttpGet]
         public async Task<ActionResult<IEnumerable<SolicitudListDto>>> GetSolicitudes()
         {
@@ -107,7 +102,6 @@ namespace Backend.Controllers
         }
 
         // GET: api/solicitudes/{id}
-        // Detalle de una solicitud (con roles y cantidades)
         [HttpGet("{id:int}")]
         public async Task<ActionResult<SolicitudDetalleDto>> GetSolicitudPorId(int id)
         {
@@ -140,7 +134,6 @@ namespace Backend.Controllers
         [HttpGet("{id:int}/propuesta-optima")]
         public async Task<ActionResult<PropuestaOptimaDto>> ObtenerPropuestaOptima(int id)
         {
-            // 1. Cargar la solicitud con sus detalles y roles
             var solicitud = await _context.SolicitudesEquipamiento
                 .Include(s => s.Detalles)
                     .ThenInclude(d => d.Rol)
@@ -152,18 +145,19 @@ namespace Backend.Controllers
             if (solicitud.Detalles == null || !solicitud.Detalles.Any())
                 return BadRequest(new { mensaje = "La solicitud no tiene detalles de roles." });
 
-            var rolesIds = solicitud.Detalles.Select(d => d.RolId).Distinct().ToList();
+            var rolesIds = solicitud.Detalles
+                .Select(d => d.RolId)
+                .Distinct()
+                .ToList();
 
-            // 2. Cargar perfiles de requerimientos para esos roles
-            var perfiles = await _context.PerfilesRequerimientos
-                .Include(p => p.Rol)
-                .Where(p => rolesIds.Contains(p.RolId))
+            var necesidades = await _context.NecesidadesPorRol
+                .Include(n => n.Rol)
+                .Where(n => rolesIds.Contains(n.RolId))
                 .ToListAsync();
 
-            if (!perfiles.Any())
-                return BadRequest(new { mensaje = "No hay perfiles de requerimientos configurados para los roles de esta solicitud." });
+            if (!necesidades.Any())
+                return BadRequest(new { mensaje = "No hay necesidades configuradas para los roles de esta solicitud." });
 
-            // 3. Cargar equipos disponibles y agruparlos por tipo, ordenando por costo (estrategia de menor costo)
             var equiposDisponibles = await _context.Equipos
                 .Where(e => e.Estado == "disponible")
                 .OrderBy(e => e.Costo)
@@ -181,15 +175,15 @@ namespace Backend.Controllers
             var faltantesDict = new Dictionary<(int rolId, string tipoEquipo), FaltanteDto>();
             decimal costoTotal = 0m;
 
-            // 4. Recorrer cada detalle de la solicitud (rol + cantidad de puestos)
             foreach (var detalle in solicitud.Detalles)
             {
                 var rol = detalle.Rol;
-                var perfilesRol = perfiles.Where(p => p.RolId == detalle.RolId).ToList();
+                var necesidadesRol = necesidades
+                    .Where(n => n.RolId == detalle.RolId)
+                    .ToList();
 
-                if (!perfilesRol.Any())
+                if (!necesidadesRol.Any())
                 {
-                    // Si no hay perfil para este rol, lo marcamos como faltante genérico
                     var key = (detalle.RolId, "SIN_PERFIL");
                     if (!faltantesDict.ContainsKey(key))
                     {
@@ -206,7 +200,6 @@ namespace Backend.Controllers
                     continue;
                 }
 
-                // Para cada puesto (ej. 3 diseñadores => puesto 1, 2, 3)
                 for (int puesto = 1; puesto <= detalle.CantidadPuestos; puesto++)
                 {
                     var asignacionRol = new AsignacionRolDto
@@ -216,17 +209,15 @@ namespace Backend.Controllers
                         PuestoNumero = puesto
                     };
 
-                    // Para cada tipo de equipo requerido por el rol
-                    foreach (var perfilReq in perfilesRol)
+                    foreach (var necesidad in necesidadesRol)
                     {
-                        var tipo = perfilReq.TipoEquipo;
-                        int cantidadNecesaria = perfilReq.CantidadRequerida;
+                        var tipo = necesidad.TipoEquipo;
+                        int cantidadNecesaria = necesidad.CantidadPorPuesto;
 
                         for (int i = 0; i < cantidadNecesaria; i++)
                         {
                             if (equiposPorTipo.ContainsKey(tipo) && equiposPorTipo[tipo].Any())
                             {
-                                // Tomar el equipo más barato disponible de ese tipo
                                 var equipo = equiposPorTipo[tipo].First();
                                 equiposPorTipo[tipo].RemoveAt(0);
 
@@ -242,7 +233,6 @@ namespace Backend.Controllers
                             }
                             else
                             {
-                                // No hay suficientes equipos de este tipo
                                 var key = (rol.Id, tipo);
                                 if (!faltantesDict.ContainsKey(key))
                                 {
@@ -278,6 +268,116 @@ namespace Backend.Controllers
 
             return Ok(propuesta);
         }
+
+
+        // PUT: api/solicitudes/{id}/estado
+        [HttpPut("{id:int}/estado")]
+        public async Task<IActionResult> ActualizarEstado(int id, [FromBody] ActualizarEstadoSolicitudDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Estado))
+                return BadRequest(new { mensaje = "El estado es obligatorio." });
+
+            var nuevoEstado = dto.Estado.Trim().ToLowerInvariant();
+
+            var solicitud = await _context.SolicitudesEquipamiento
+                .Include(s => s.Detalles)
+                    .ThenInclude(d => d.Rol)
+                .FirstOrDefaultAsync(s => s.Id == id);
+
+            if (solicitud == null)
+                return NotFound(new { mensaje = "Solicitud no encontrada" });
+
+            if (nuevoEstado == "resuelta")
+            {
+                var rolesIds = solicitud.Detalles
+                    .Select(d => d.RolId)
+                    .Distinct()
+                    .ToList();
+
+                var necesidades = await _context.NecesidadesPorRol
+                    .Where(n => rolesIds.Contains(n.RolId))
+                    .ToListAsync();
+
+                var equiposDisponibles = await _context.Equipos
+                    .Where(e => e.Estado == "disponible")
+                    .OrderBy(e => e.Costo)
+                    .ToListAsync();
+
+                var equiposPorTipo = equiposDisponibles
+                    .GroupBy(e => e.TipoEquipo)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                var empleadosDisponibles = await _context.Empleados
+                    .Where(emp => emp.EstaActivo && emp.EstaDisponible && rolesIds.Contains(emp.RolId))
+                    .OrderBy(emp => emp.Id)
+                    .ToListAsync();
+
+                var empleadosPorRol = empleadosDisponibles
+                    .GroupBy(emp => emp.RolId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                foreach (var detalle in solicitud.Detalles)
+                {
+                    var rol = detalle.Rol;
+                    var necesidadesRol = necesidades
+                        .Where(n => n.RolId == detalle.RolId)
+                        .ToList();
+
+                    if (!necesidadesRol.Any())
+                        continue;
+
+                    if (!empleadosPorRol.TryGetValue(detalle.RolId, out var listaEmpleadosRol) ||
+                        listaEmpleadosRol.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    for (int puesto = 1; puesto <= detalle.CantidadPuestos; puesto++)
+                    {
+                        if (listaEmpleadosRol.Count == 0)
+                            break;
+
+                        var empleado = listaEmpleadosRol.First();
+                        listaEmpleadosRol.RemoveAt(0);
+                        empleado.EstaDisponible = false;
+
+                        foreach (var necesidad in necesidadesRol)
+                        {
+                            var tipo = necesidad.TipoEquipo;
+                            int cantidadNecesaria = necesidad.CantidadPorPuesto;
+
+                            for (int i = 0; i < cantidadNecesaria; i++)
+                            {
+                                if (equiposPorTipo.ContainsKey(tipo) && equiposPorTipo[tipo].Any())
+                                {
+                                    var equipo = equiposPorTipo[tipo].First();
+                                    equiposPorTipo[tipo].RemoveAt(0);
+
+                                    equipo.Estado = "asignado";
+                                    equipo.EmpleadoAsignadoId = empleado.Id;
+
+                                    _context.HistorialAsignaciones.Add(new HistorialAsignacion
+                                    {
+                                        EquipoId = equipo.Id,
+                                        EmpleadoId = empleado.Id,
+                                        SolicitudId = solicitud.Id,
+                                        Comentario = $"Asignado a {empleado.NombreCompleto} ({rol.NombreRol})."
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            solicitud.Estado = nuevoEstado;
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+
 
     }
 }

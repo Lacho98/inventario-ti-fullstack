@@ -7,6 +7,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "backend", "backend", "{89A5
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "frontend", "frontend", "{20578D32-4133-4D07-ADCF-187A72867B6A}"
 	ProjectSection(SolutionItems) = preProject
+		frontend\frontend\src\App.css = frontend\frontend\src\App.css
+		frontend\frontend\src\App.jsx = frontend\frontend\src\App.jsx
 		frontend\frontend\package.json = frontend\frontend\package.json
 	EndProjectSection
 EndProject

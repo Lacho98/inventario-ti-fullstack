@@ -17,5 +17,7 @@ namespace Backend.Data
         public DbSet<SolicitudEquipamiento> SolicitudesEquipamiento { get; set; }
         public DbSet<DetalleSolicitud> DetallesSolicitud { get; set; }
         public DbSet<HistorialAsignacion> HistorialAsignaciones { get; set; }
+        public DbSet<NecesidadPorRol> NecesidadesPorRol { get; set; }
+
     }
 }
