@@ -19,6 +19,13 @@ Puede ejecutarse tanto de forma local como mediante Docker Compose.
 - **Node.js + npm**  
   Solo si se ejecuta el frontend localmente, sin Docker.
 
+> **Nota (solo para Windows Home):**  
+> Docker Desktop requiere **WSL2** para ejecutar contenedores Linux, incluyendo SQL Server.  
+> En la mayoría de los casos Docker lo configura automáticamente, pero si aparece algún error, puede ser necesario habilitar WSL2 manualmente.  
+>
+> Guía oficial: https://learn.microsoft.com/windows/wsl/install
+
+
 ---
 
 ## EJECUCIÓN CON DOCKER COMPOSE (Recomendado)
