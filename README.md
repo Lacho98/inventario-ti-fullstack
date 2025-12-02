@@ -27,10 +27,17 @@ Desde la raíz del proyecto:(Donde se encuentra **docker-compose.yml**)
 Ejecutar el siguiente comando:
 docker compose up --build
 
+## Verificar en Docker Desktop que esta corriendo:
+-Frontend
+-Backend
+-Sql
+
 Servicios iniciados:
 - Frontend: http://localhost:3000
 - Backend: http://localhost:8080/swagger
 - SQL Server: localhost,1433
+
+
 
 ---
 
