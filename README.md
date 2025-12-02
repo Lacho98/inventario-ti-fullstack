@@ -28,9 +28,9 @@ Ejecutar el siguiente comando:
 docker compose up --build
 
 ## Verificar en Docker Desktop que esta corriendo:
--Frontend
--Backend
--Sql
+- Frontend
+- Backend
+- Sql
 
 Servicios iniciados:
 - Frontend: http://localhost:3000
